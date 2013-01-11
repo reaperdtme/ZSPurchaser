@@ -8,18 +8,19 @@
 #import <Foundation/Foundation.h>
 #import <StoreKit/StoreKit.h>
 
-typedef void (^ProductRequestBlock) (BOOL success, NSArray *products);
+typedef void (^ProductRequestBlock) (NSArray *products);
 typedef void (^PurchaseSuccessBlock)(BOOL success, id result);
 
-@interface WPurchaser : NSObject <SKProductsRequestDelegate, SKPaymentTransactionObserver>
+@interface ZSPurchaser : NSObject <SKProductsRequestDelegate, SKPaymentTransactionObserver>
 
 @property (nonatomic, strong) NSArray *products;
 @property (nonatomic, strong) SKProduct *purchase;
-@property (nonatomic, strong) ProductRequestBlock productComplete;
-@property (nonatomic, strong) PurchaseSuccessBlock completion;
+@property (nonatomic, strong) ProductRequestBlock productRequestBlock;
+@property (nonatomic, strong) PurchaseSuccessBlock purchaseSuccessBlock;
 @property NSInteger maxUnknownErrorAttempts;
 
-- (void)requestProducts:(ProductRequestBlock)productRequestBlock;
+- (void)requestProducts:(NSString *) productId,...;
 - (void)purchaseProduct:(SKProduct*)product onComplete:(PurchaseSuccessBlock)completion;
++ (ZSPurchaser *)p;
 
 @end

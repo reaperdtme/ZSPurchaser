@@ -7,24 +7,32 @@
 //
 
 #import "WPurchaser.h"
+#import "WRemote.h"
+#import "Mixpanel.h"
+#import "WAppDelegate.h"
 
-@implementation WPurchaser {
+@implementation ZSPurchaser {
     NSInteger retries;
 }
 
-@synthesize purchase, productComplete, completion, maxUnknownErrorAttempts;
+@synthesize purchase, productRequestBlock, purchaseSuccessBlock, maxUnknownErrorAttempts;
 
-- (void)requestProducts:(ProductRequestBlock)productBlock {
-    NSSet *productIds = [NSSet setWithObjects:kInApp1MonthSubscription, kInApp3MonthSubscription, kInApp6MonthSubscription, kInAppPurchase1DaySubscription, nil];
+- (void)requestProducts:(NSString *)productId, ... {
+    NSMutableSet *productIds = [NSMutableSet set];
+	va_list args;
+    va_start(args, productId);
+    for (NSString *arg = productId; arg != nil; arg = va_arg(args, NSString *)) {
+        [productIds addObject:arg];
+    }
+    va_end(args);
     SKProductsRequest *req = [[SKProductsRequest alloc] initWithProductIdentifiers:productIds];
     req.delegate = self;
     [req start];
-    self.productComplete = productBlock;
 }
 
 - (void)productsRequest:(SKProductsRequest *)request didReceiveResponse:(SKProductsResponse *)response {
     self.products = response.products;
-    if (productComplete) productComplete(YES, self.products);
+    if (productRequestBlock) productRequestBlock(self.products);
 }
 
 - (void)purchaseProduct:(SKProduct *)product onComplete:(PurchaseSuccessBlock)completion {
@@ -39,22 +47,21 @@
         switch (transaction.transactionState) {
             case SKPaymentTransactionStatePurchased:
             case SKPaymentTransactionStateRestored:
-                if (completion) {
-                    completion(YES, transaction);
+                if (purchaseSuccessBlock) {
+                    purchaseSuccessBlock(YES, transaction);
                 }
                 [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
                 break;
             case SKPaymentTransactionStateFailed: {
-                NSMutableDictionary *errorCode = [NSMutableDictionary dictionary];
 				if (transaction.error.code == SKErrorUnknown && retries < self.maxUnknownErrorAttempts) {
                     retries++;
                     [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                    [self purchaseProduct:self.purchase onComplete:self.completion];
+                    [self purchaseProduct:self.purchase onComplete:self.purchaseSuccessBlock];
                     return;
 				}
                 retries = 0;
                 [[SKPaymentQueue defaultQueue] finishTransaction: transaction];
-                if(self.completion) self.completion(NO, transaction.error);
+                if(self.purchaseSuccessBlock) self.purchaseSuccessBlock(NO, transaction.error);
                 else [[NSNotificationCenter defaultCenter] postNotificationName:@"failed_purchase" object:nil];
                 break;
             }
@@ -62,6 +69,12 @@
                 break;
         }
     }
+}
+
++ (ZSPurchaser *)p {
+	ZSPurchaser *p = [[ZSPurchaser alloc] init];
+	p.maxUnknownErrorAttempts = 3;
+	return p;
 }
 
 @end
